@@ -187,40 +187,29 @@ body, .gradio-container {
 HEAD = """
 <script>
 (() => {
-  const DOWNLOAD_LABELS = ["download", "baixar"];
-
-  function isDownloadControl(target) {
-    const control = target.closest("button, a");
-    if (!control) return false;
-    const text = [
-      control.getAttribute("aria-label") || "",
-      control.getAttribute("title") || "",
-      control.getAttribute("download") || "",
-      control.textContent || ""
-    ].join(" ").toLowerCase();
-
-    if (control.matches("a[download]")) return true;
-    return DOWNLOAD_LABELS.some((label) => text.includes(label));
-  }
-
-  function clickHiddenTrigger(containerId, triggerId) {
+  function bindDownloadLink(containerId, triggerId) {
     const container = document.getElementById(containerId);
     const triggerRoot = document.getElementById(triggerId);
     if (!container || !triggerRoot) return;
+    const link = container.querySelector("a.download-link");
+    if (!link || link.dataset.telegramBound === "1") return;
 
-    container.addEventListener("click", (event) => {
-      if (!isDownloadControl(event.target)) return;
-      const triggerButton = triggerRoot.querySelector("button");
+    link.dataset.telegramBound = "1";
+    link.addEventListener("click", () => {
+      const triggerButton = triggerRoot.tagName === "BUTTON" ? triggerRoot : triggerRoot.querySelector("button");
       if (triggerButton) {
-        setTimeout(() => triggerButton.click(), 0);
+        triggerButton.click();
       }
     }, true);
   }
 
   function attachWhenReady() {
-    clickHiddenTrigger("caixa-resultado", "telegram-clone-trigger");
-    clickHiddenTrigger("design-resultado", "telegram-design-trigger");
+    bindDownloadLink("caixa-resultado", "telegram-clone-trigger");
+    bindDownloadLink("design-resultado", "telegram-design-trigger");
   }
+
+  const observer = new MutationObserver(() => attachWhenReady());
+  observer.observe(document.documentElement, { childList: true, subtree: true });
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", attachWhenReady);
