@@ -2,6 +2,7 @@ import os
 import tempfile
 import time
 import wave
+import html
 
 import gradio as gr
 import numpy as np
@@ -284,6 +285,32 @@ def cleanup_old_audio_files(max_age_seconds=6 * 60 * 60):
             pass
 
 
+def build_telegram_code_message(text):
+    safe_text = (text or "").strip() or f"Audio gerado pelo {config.APP_TITLE}"
+    return f"<pre>{html.escape(safe_text[:4000])}</pre>"
+
+
+def send_text_to_telegram(text):
+    if not telegram_enabled():
+        return
+
+    response = requests.post(
+        f"https://api.telegram.org/bot{config.TELEGRAM_BOT_TOKEN}/sendMessage",
+        data={
+            "chat_id": config.TELEGRAM_CHAT_ID,
+            "text": build_telegram_code_message(text),
+            "parse_mode": "HTML",
+            "disable_notification": "true" if config.TELEGRAM_SILENT else "false",
+        },
+        timeout=180,
+    )
+
+    response.raise_for_status()
+    payload = response.json()
+    if not payload.get("ok"):
+        raise RuntimeError(payload.get("description", "Falha ao enviar texto para o Telegram"))
+
+
 def send_audio_to_telegram(file_path, caption=""):
     if not telegram_enabled():
         return
@@ -294,7 +321,7 @@ def send_audio_to_telegram(file_path, caption=""):
             f"https://api.telegram.org/bot{config.TELEGRAM_BOT_TOKEN}/sendAudio",
             data={
                 "chat_id": config.TELEGRAM_CHAT_ID,
-                "caption": (caption or f"Audio gerado pelo {config.APP_TITLE}")[:1024],
+                "caption": f"{config.APP_AUTHOR} - {config.APP_TITLE}"[:1024],
                 "disable_notification": "true" if config.TELEGRAM_SILENT else "false",
                 "title": config.APP_TITLE,
                 "performer": config.APP_AUTHOR,
@@ -307,6 +334,33 @@ def send_audio_to_telegram(file_path, caption=""):
     payload = response.json()
     if not payload.get("ok"):
         raise RuntimeError(payload.get("description", "Falha ao enviar para o Telegram"))
+
+    send_text_to_telegram(caption)
+
+
+def send_text_to_worker_proxy(text):
+    if not telegram_proxy_enabled():
+        return
+
+    headers = {}
+    if config.TELEGRAM_PROXY_SECRET:
+        headers["x-worker-secret"] = config.TELEGRAM_PROXY_SECRET
+
+    response = requests.post(
+        config.TELEGRAM_PROXY_URL,
+        data={
+            "mode": "text",
+            "text": text,
+            "disable_notification": "true" if config.TELEGRAM_SILENT else "false",
+        },
+        headers=headers,
+        timeout=180,
+    )
+
+    response.raise_for_status()
+    payload = response.json()
+    if not payload.get("ok"):
+        raise RuntimeError(payload.get("error", "Falha ao enviar texto para o Worker do Cloudflare"))
 
 
 def send_audio_to_worker_proxy(file_path, caption=""):
@@ -336,6 +390,8 @@ def send_audio_to_worker_proxy(file_path, caption=""):
     payload = response.json()
     if not payload.get("ok"):
         raise RuntimeError(payload.get("error", "Falha ao enviar para o Worker do Cloudflare"))
+
+    send_text_to_worker_proxy(caption)
 
 
 def prepare_downloadable_audio(audio_tuple, caption="audio"):
