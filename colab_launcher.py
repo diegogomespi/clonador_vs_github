@@ -145,7 +145,15 @@ def show_success(share_url):
     display.display(display.HTML(html_btn))
 
 
-def run_from_colab(repo_url, branch="main", project_dir="/content/clonador_vs_github"):
+def run_from_colab(
+    repo_url,
+    branch="main",
+    project_dir="/content/clonador_vs_github",
+    telegram_bot_token="",
+    telegram_chat_id="",
+    telegram_send_audio=True,
+    telegram_silent=False,
+):
     try:
         update_loading("Preparando ambiente", "Iniciando configuracao do Colab...", 5)
         repo_dir = sync_repo(repo_url, branch, project_dir)
@@ -153,6 +161,10 @@ def run_from_colab(repo_url, branch="main", project_dir="/content/clonador_vs_gi
 
         update_loading("Carregando aplicacao", "Importando arquivos do projeto...", 75)
         append_log("> Importando app.py e config.py...")
+        os.environ["TELEGRAM_BOT_TOKEN"] = telegram_bot_token.strip()
+        os.environ["TELEGRAM_CHAT_ID"] = telegram_chat_id.strip()
+        os.environ["TELEGRAM_SEND_AUDIO"] = "true" if telegram_send_audio else "false"
+        os.environ["TELEGRAM_SILENT"] = "true" if telegram_silent else "false"
         if repo_dir not in sys.path:
             sys.path.insert(0, repo_dir)
 

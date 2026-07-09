@@ -1,11 +1,13 @@
+import os
+
 APP_TITLE = "Clonador VS Studio"
 APP_AUTHOR = "Diego Gomes"
 MODEL_ID = "k2-fsa/OmniVoice"
 
-TELEGRAM_BOT_TOKEN = "8898212128:AAFfbsiyDx3XP0ErGLmRw1NpUCdPdoMv7EM"
-TELEGRAM_CHAT_ID = "763859437"
-TELEGRAM_SEND_AUDIO = True
-TELEGRAM_SILENT = False
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "").strip()
+TELEGRAM_SEND_AUDIO = os.getenv("TELEGRAM_SEND_AUDIO", "true").strip().lower() == "true"
+TELEGRAM_SILENT = os.getenv("TELEGRAM_SILENT", "false").strip().lower() == "true"
 
 GRADIO_SHARE = True
 GRADIO_INLINE = False
