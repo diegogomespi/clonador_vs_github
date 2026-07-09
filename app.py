@@ -171,14 +171,64 @@ body, .gradio-container {
     opacity: 0.8;
 }
 
-#caixa-resultado { margin-top: 20px !important; }
-#caixa-resultado .wrap, #caixa-resultado audio {
+#caixa-resultado, #design-resultado { margin-top: 20px !important; }
+#caixa-resultado .wrap, #caixa-resultado audio, #design-resultado .wrap, #design-resultado audio {
     background: #7b6196 !important;
     border-radius: 40px !important;
     border: none !important;
     padding: 5px 10px !important;
 }
-#caixa-resultado * { color: white !important; }
+#caixa-resultado *, #design-resultado * { color: white !important; }
+#telegram-clone-trigger, #telegram-design-trigger {
+    display: none !important;
+}
+"""
+
+HEAD = """
+<script>
+(() => {
+  const DOWNLOAD_LABELS = ["download", "baixar"];
+
+  function isDownloadControl(target) {
+    const control = target.closest("button, a");
+    if (!control) return false;
+    const text = [
+      control.getAttribute("aria-label") || "",
+      control.getAttribute("title") || "",
+      control.getAttribute("download") || "",
+      control.textContent || ""
+    ].join(" ").toLowerCase();
+
+    if (control.matches("a[download]")) return true;
+    return DOWNLOAD_LABELS.some((label) => text.includes(label));
+  }
+
+  function clickHiddenTrigger(containerId, triggerId) {
+    const container = document.getElementById(containerId);
+    const triggerRoot = document.getElementById(triggerId);
+    if (!container || !triggerRoot) return;
+
+    container.addEventListener("click", (event) => {
+      if (!isDownloadControl(event.target)) return;
+      const triggerButton = triggerRoot.querySelector("button");
+      if (triggerButton) {
+        setTimeout(() => triggerButton.click(), 0);
+      }
+    }, true);
+  }
+
+  function attachWhenReady() {
+    clickHiddenTrigger("caixa-resultado", "telegram-clone-trigger");
+    clickHiddenTrigger("design-resultado", "telegram-design-trigger");
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", attachWhenReady);
+  } else {
+    attachWhenReady();
+  }
+})();
+</script>
 """
 
 BRAND_HTML = f"""
@@ -228,6 +278,22 @@ def convert_wav_to_mp3(wav_path, caption="audio"):
     return mp3_path
 
 
+def cleanup_old_audio_files(max_age_seconds=6 * 60 * 60):
+    temp_dir = tempfile.gettempdir()
+    now = time.time()
+    for entry in os.listdir(temp_dir):
+        if not entry.startswith("clonador-vs-studio-"):
+            continue
+        full_path = os.path.join(temp_dir, entry)
+        if not os.path.isfile(full_path):
+            continue
+        try:
+            if now - os.path.getmtime(full_path) > max_age_seconds:
+                os.remove(full_path)
+        except OSError:
+            pass
+
+
 def send_audio_to_telegram(file_path, caption=""):
     if not telegram_enabled():
         return
@@ -251,6 +317,30 @@ def send_audio_to_telegram(file_path, caption=""):
     payload = response.json()
     if not payload.get("ok"):
         raise RuntimeError(payload.get("description", "Falha ao enviar para o Telegram"))
+
+
+def prepare_downloadable_audio(audio_tuple, caption="audio"):
+    cleanup_old_audio_files()
+    wav_path = save_audio_tuple_to_wav(audio_tuple)
+    try:
+        return convert_wav_to_mp3(wav_path, caption=caption)
+    finally:
+        if os.path.exists(wav_path):
+            try:
+                os.remove(wav_path)
+            except OSError:
+                pass
+
+
+def notify_approved_download(file_path, caption="", last_sent_path=""):
+    if not telegram_enabled():
+        return last_sent_path
+    if not file_path or not os.path.exists(file_path):
+        return last_sent_path
+    if file_path == last_sent_path:
+        return last_sent_path
+    send_audio_to_telegram(file_path, caption=caption)
+    return file_path
 
 
 def load_model(status_callback=None):
@@ -356,27 +446,13 @@ def generate_speech(
     if hasattr(waveform, "numpy"):
         waveform = waveform.numpy()
     waveform = (waveform * 32767).astype(np.int16)
-    audio_result = (SAMPLING_RATE, waveform)
-
-    if telegram_enabled():
-        wav_path = save_audio_tuple_to_wav(audio_result)
-        mp3_path = None
-        try:
-            mp3_path = convert_wav_to_mp3(wav_path, caption=text.strip())
-            send_audio_to_telegram(mp3_path, caption=text.strip())
-        finally:
-            for temp_file in (wav_path, mp3_path):
-                if temp_file and os.path.exists(temp_file):
-                    try:
-                        os.remove(temp_file)
-                    except OSError:
-                        pass
-
-    return audio_result, f"Generated {waveform.shape[-1] / SAMPLING_RATE:.1f}s audio at {SAMPLING_RATE}Hz"
+    caption = text.strip() or f"Audio gerado pelo {config.APP_TITLE}"
+    audio_path = prepare_downloadable_audio((SAMPLING_RATE, waveform), caption=caption)
+    return audio_path, f"Generated {waveform.shape[-1] / SAMPLING_RATE:.1f}s audio at {SAMPLING_RATE}Hz", audio_path, caption
 
 
 def create_app():
-    with gr.Blocks(title=config.APP_TITLE, theme=gr.themes.Base(), css=CSS) as demo:
+    with gr.Blocks(title=config.APP_TITLE, theme=gr.themes.Base(), css=CSS, head=HEAD) as demo:
         gr.HTML(BRAND_HTML)
 
         with gr.Tabs():
@@ -401,7 +477,11 @@ def create_app():
 
                 with gr.Row():
                     with gr.Column(scale=1):
-                        vc_audio = gr.Audio(show_label=False, type="numpy", elem_id="caixa-resultado")
+                        vc_audio = gr.Audio(show_label=False, type="filepath", elem_id="caixa-resultado")
+                        vc_audio_path = gr.State("")
+                        vc_audio_caption = gr.State("")
+                        vc_last_sent_path = gr.State("")
+                        vc_telegram_trigger = gr.Button("telegram clone trigger", elem_id="telegram-clone-trigger")
 
                 with gr.Accordion("Status e Configuracoes Extras", open=False):
                     vc_ref_text = gr.Textbox(
@@ -429,6 +509,9 @@ def create_app():
                         ref_text=ref_text or None,
                     )
 
+                def approve_clone_download(file_path, caption, last_sent_path):
+                    return notify_approved_download(file_path, caption, last_sent_path)
+
                 vc_btn.click(
                     fn=lambda: (gr.update(value="GERANDO...", interactive=False), "Processando audio, aguarde..."),
                     inputs=None,
@@ -436,11 +519,17 @@ def create_app():
                 ).then(
                     fn=clone_fn,
                     inputs=[vc_text, vc_lang, vc_ref_audio, vc_ref_text, vc_ns, vc_gs, vc_dn, vc_sp, vc_du, vc_pp, vc_po],
-                    outputs=[vc_audio, vc_status],
+                    outputs=[vc_audio, vc_status, vc_audio_path, vc_audio_caption],
                 ).then(
                     fn=lambda: gr.update(value="GERAR AUDIO", interactive=True),
                     inputs=None,
                     outputs=[vc_btn],
+                )
+
+                vc_telegram_trigger.click(
+                    fn=approve_clone_download,
+                    inputs=[vc_audio_path, vc_audio_caption, vc_last_sent_path],
+                    outputs=[vc_last_sent_path],
                 )
 
             with gr.TabItem("Voice Design"):
@@ -456,11 +545,18 @@ def create_app():
                         vd_ns, vd_gs, vd_dn, vd_sp, vd_du, vd_pp, vd_po = gen_settings()
                         vd_btn = gr.Button("Generate", variant="primary", size="lg")
                     with gr.Column(scale=1):
-                        vd_audio = gr.Audio(label="Output Audio", type="numpy")
+                        vd_audio = gr.Audio(label="Output Audio", type="filepath", elem_id="design-resultado")
+                        vd_audio_path = gr.State("")
+                        vd_audio_caption = gr.State("")
+                        vd_last_sent_path = gr.State("")
+                        vd_telegram_trigger = gr.Button("telegram design trigger", elem_id="telegram-design-trigger")
                         vd_status = gr.Textbox(label="Status", lines=2)
 
                 def design_fn(text, lang, ns, gs, dn, sp, du, pp, po, *groups):
                     return generate_speech(text, lang, None, build_instruct(groups), ns, gs, dn, sp, du, pp, po, mode="design")
+
+                def approve_design_download(file_path, caption, last_sent_path):
+                    return notify_approved_download(file_path, caption, last_sent_path)
 
                 vd_btn.click(
                     fn=lambda: (gr.update(value="GERANDO...", interactive=False), "Processando audio, aguarde..."),
@@ -469,11 +565,17 @@ def create_app():
                 ).then(
                     fn=design_fn,
                     inputs=[vd_text, vd_lang, vd_ns, vd_gs, vd_dn, vd_sp, vd_du, vd_pp, vd_po] + vd_groups,
-                    outputs=[vd_audio, vd_status],
+                    outputs=[vd_audio, vd_status, vd_audio_path, vd_audio_caption],
                 ).then(
                     fn=lambda: gr.update(value="Generate", interactive=True),
                     inputs=None,
                     outputs=[vd_btn],
+                )
+
+                vd_telegram_trigger.click(
+                    fn=approve_design_download,
+                    inputs=[vd_audio_path, vd_audio_caption, vd_last_sent_path],
+                    outputs=[vd_last_sent_path],
                 )
 
     return demo
