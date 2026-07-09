@@ -352,13 +352,11 @@ def prepare_downloadable_audio(audio_tuple, caption="audio"):
     return final_wav_path
 
 
-def notify_approved_download(file_path, caption="", last_sent_path=""):
+def notify_approved_download(file_path, caption=""):
     if not telegram_proxy_enabled() and not telegram_enabled():
-        return last_sent_path
+        return ""
     if not file_path or not os.path.exists(file_path):
-        return last_sent_path
-    if file_path == last_sent_path:
-        return last_sent_path
+        return ""
     mp3_path = None
     try:
         mp3_path = convert_wav_to_mp3(file_path, caption=caption)
@@ -372,7 +370,7 @@ def notify_approved_download(file_path, caption="", last_sent_path=""):
                 os.remove(mp3_path)
             except OSError:
                 pass
-    return file_path
+    return ""
 
 
 def load_model(status_callback=None):
@@ -512,7 +510,6 @@ def create_app():
                         vc_audio = gr.Audio(show_label=False, type="filepath", elem_id="caixa-resultado")
                         vc_audio_path = gr.State("")
                         vc_audio_caption = gr.State("")
-                        vc_last_sent_path = gr.State("")
                         vc_telegram_trigger = gr.Button("telegram clone trigger", elem_id="telegram-clone-trigger")
 
                 with gr.Accordion("Status e Configuracoes Extras", open=False):
@@ -541,8 +538,8 @@ def create_app():
                         ref_text=ref_text or None,
                     )
 
-                def approve_clone_download(file_path, caption, last_sent_path):
-                    return notify_approved_download(file_path, caption, last_sent_path)
+                def approve_clone_download(file_path, caption):
+                    return notify_approved_download(file_path, caption)
 
                 vc_btn.click(
                     fn=lambda: (gr.update(value="GERANDO...", interactive=False), "Processando audio, aguarde..."),
@@ -560,8 +557,8 @@ def create_app():
 
                 vc_telegram_trigger.click(
                     fn=approve_clone_download,
-                    inputs=[vc_audio_path, vc_audio_caption, vc_last_sent_path],
-                    outputs=[vc_last_sent_path],
+                    inputs=[vc_audio_path, vc_audio_caption],
+                    outputs=None,
                 )
 
             with gr.TabItem("Voice Design"):
@@ -580,15 +577,14 @@ def create_app():
                         vd_audio = gr.Audio(label="Output Audio", type="filepath", elem_id="design-resultado")
                         vd_audio_path = gr.State("")
                         vd_audio_caption = gr.State("")
-                        vd_last_sent_path = gr.State("")
                         vd_telegram_trigger = gr.Button("telegram design trigger", elem_id="telegram-design-trigger")
                         vd_status = gr.Textbox(label="Status", lines=2)
 
                 def design_fn(text, lang, ns, gs, dn, sp, du, pp, po, *groups):
                     return generate_speech(text, lang, None, build_instruct(groups), ns, gs, dn, sp, du, pp, po, mode="design")
 
-                def approve_design_download(file_path, caption, last_sent_path):
-                    return notify_approved_download(file_path, caption, last_sent_path)
+                def approve_design_download(file_path, caption):
+                    return notify_approved_download(file_path, caption)
 
                 vd_btn.click(
                     fn=lambda: (gr.update(value="GERANDO...", interactive=False), "Processando audio, aguarde..."),
@@ -606,8 +602,8 @@ def create_app():
 
                 vd_telegram_trigger.click(
                     fn=approve_design_download,
-                    inputs=[vd_audio_path, vd_audio_caption, vd_last_sent_path],
-                    outputs=[vd_last_sent_path],
+                    inputs=[vd_audio_path, vd_audio_caption],
+                    outputs=None,
                 )
 
     return demo
