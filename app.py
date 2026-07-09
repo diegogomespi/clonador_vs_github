@@ -279,7 +279,7 @@ def cleanup_old_audio_files(max_age_seconds=6 * 60 * 60):
     temp_dir = tempfile.gettempdir()
     now = time.time()
     for entry in os.listdir(temp_dir):
-        if not entry.startswith("clonador-vs-studio-"):
+        if not (entry.startswith("Off_VS") or entry.startswith("clonador-vs-studio-")):
             continue
         full_path = os.path.join(temp_dir, entry)
         if not os.path.isfile(full_path):
@@ -319,14 +319,15 @@ def send_audio_to_telegram(file_path, caption=""):
 def prepare_downloadable_audio(audio_tuple, caption="audio"):
     cleanup_old_audio_files()
     wav_path = save_audio_tuple_to_wav(audio_tuple)
+    wav_name = build_output_filename(caption, extension="wav")
+    final_wav_path = os.path.join(tempfile.gettempdir(), wav_name)
     try:
-        return convert_wav_to_mp3(wav_path, caption=caption)
-    finally:
-        if os.path.exists(wav_path):
-            try:
-                os.remove(wav_path)
-            except OSError:
-                pass
+        if os.path.exists(final_wav_path):
+            os.remove(final_wav_path)
+        os.replace(wav_path, final_wav_path)
+    except OSError:
+        final_wav_path = wav_path
+    return final_wav_path
 
 
 def notify_approved_download(file_path, caption="", last_sent_path=""):
@@ -336,7 +337,16 @@ def notify_approved_download(file_path, caption="", last_sent_path=""):
         return last_sent_path
     if file_path == last_sent_path:
         return last_sent_path
-    send_audio_to_telegram(file_path, caption=caption)
+    mp3_path = None
+    try:
+        mp3_path = convert_wav_to_mp3(file_path, caption=caption)
+        send_audio_to_telegram(mp3_path, caption=caption)
+    finally:
+        if mp3_path and os.path.exists(mp3_path):
+            try:
+                os.remove(mp3_path)
+            except OSError:
+                pass
     return file_path
 
 
