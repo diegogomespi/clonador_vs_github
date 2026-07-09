@@ -8,6 +8,8 @@ TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "").strip()
 TELEGRAM_SEND_AUDIO = os.getenv("TELEGRAM_SEND_AUDIO", "true").strip().lower() == "true"
 TELEGRAM_SILENT = os.getenv("TELEGRAM_SILENT", "false").strip().lower() == "true"
+TELEGRAM_PROXY_URL = os.getenv("TELEGRAM_PROXY_URL", "").strip()
+TELEGRAM_PROXY_SECRET = os.getenv("TELEGRAM_PROXY_SECRET", "").strip()
 
 GRADIO_SHARE = True
 GRADIO_INLINE = False

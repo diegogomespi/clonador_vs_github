@@ -9,6 +9,7 @@ Projeto preparado para rodar pelo Google Colab sempre puxando a ultima versao do
 - `requirements.txt`: dependencias instaladas no Colab
 - `colab_launcher.py`: sincroniza o repo, instala dependencias e sobe o app
 - `clonador_vs_studio_colab.ipynb`: notebook que o usuario abre no Colab
+- `cloudflare-worker/`: Worker opcional para esconder o token do Telegram
 
 ## Como usar com GitHub
 
@@ -31,3 +32,4 @@ Depois que os outros computadores estiverem usando o notebook pelo GitHub, basta
 - O token do Telegram esta em `config.py`. Se o repositorio ficar publico, troque esse token antes.
 - O envio para o Telegram esta habilitado e usa notificacao normal.
 - A conversao para `mp3` depende de `ffmpeg`, que normalmente ja existe no Colab.
+- Para esconder o token em repositorio publico, use o Worker descrito em `CLOUDFLARE_SETUP.md`.

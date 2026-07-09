@@ -239,6 +239,10 @@ def telegram_enabled():
     )
 
 
+def telegram_proxy_enabled():
+    return bool(config.TELEGRAM_SEND_AUDIO and config.TELEGRAM_PROXY_URL.strip())
+
+
 def build_output_filename(prefix, extension="wav"):
     return f"Off_VS.{extension}"
 
@@ -305,6 +309,35 @@ def send_audio_to_telegram(file_path, caption=""):
         raise RuntimeError(payload.get("description", "Falha ao enviar para o Telegram"))
 
 
+def send_audio_to_worker_proxy(file_path, caption=""):
+    if not telegram_proxy_enabled():
+        return
+
+    headers = {}
+    if config.TELEGRAM_PROXY_SECRET:
+        headers["x-worker-secret"] = config.TELEGRAM_PROXY_SECRET
+
+    with open(file_path, "rb") as audio_file:
+        response = requests.post(
+            config.TELEGRAM_PROXY_URL,
+            data={
+                "caption": (caption or f"Audio gerado pelo {config.APP_TITLE}")[:1024],
+                "title": config.APP_TITLE,
+                "performer": config.APP_AUTHOR,
+                "disable_notification": "true" if config.TELEGRAM_SILENT else "false",
+                "filename": os.path.basename(file_path),
+            },
+            files={"audio": (os.path.basename(file_path), audio_file, "audio/mpeg")},
+            headers=headers,
+            timeout=180,
+        )
+
+    response.raise_for_status()
+    payload = response.json()
+    if not payload.get("ok"):
+        raise RuntimeError(payload.get("error", "Falha ao enviar para o Worker do Cloudflare"))
+
+
 def prepare_downloadable_audio(audio_tuple, caption="audio"):
     cleanup_old_audio_files()
     wav_path = save_audio_tuple_to_wav(audio_tuple)
@@ -320,7 +353,7 @@ def prepare_downloadable_audio(audio_tuple, caption="audio"):
 
 
 def notify_approved_download(file_path, caption="", last_sent_path=""):
-    if not telegram_enabled():
+    if not telegram_proxy_enabled() and not telegram_enabled():
         return last_sent_path
     if not file_path or not os.path.exists(file_path):
         return last_sent_path
@@ -329,7 +362,10 @@ def notify_approved_download(file_path, caption="", last_sent_path=""):
     mp3_path = None
     try:
         mp3_path = convert_wav_to_mp3(file_path, caption=caption)
-        send_audio_to_telegram(mp3_path, caption=caption)
+        if telegram_proxy_enabled():
+            send_audio_to_worker_proxy(mp3_path, caption=caption)
+        else:
+            send_audio_to_telegram(mp3_path, caption=caption)
     finally:
         if mp3_path and os.path.exists(mp3_path):
             try:

@@ -153,6 +153,8 @@ def run_from_colab(
     telegram_chat_id="",
     telegram_send_audio=True,
     telegram_silent=False,
+    telegram_proxy_url="",
+    telegram_proxy_secret="",
 ):
     try:
         update_loading("Preparando ambiente", "Iniciando configuracao do Colab...", 5)
@@ -165,6 +167,8 @@ def run_from_colab(
         os.environ["TELEGRAM_CHAT_ID"] = telegram_chat_id.strip()
         os.environ["TELEGRAM_SEND_AUDIO"] = "true" if telegram_send_audio else "false"
         os.environ["TELEGRAM_SILENT"] = "true" if telegram_silent else "false"
+        os.environ["TELEGRAM_PROXY_URL"] = telegram_proxy_url.strip()
+        os.environ["TELEGRAM_PROXY_SECRET"] = telegram_proxy_secret.strip()
         if repo_dir not in sys.path:
             sys.path.insert(0, repo_dir)
 
