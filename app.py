@@ -251,10 +251,7 @@ def telegram_enabled():
 
 
 def build_output_filename(prefix, extension="wav"):
-    safe_prefix = "".join(ch for ch in (prefix or "audio") if ch.isalnum() or ch in ("-", "_", " ")).strip()
-    safe_prefix = safe_prefix[:60] or "audio"
-    timestamp = time.strftime("%Y%m%d-%H%M%S")
-    return f"{safe_prefix}-{timestamp}.{extension}".replace(" ", "_")
+    return f"Off_VS.{extension}"
 
 
 def save_audio_tuple_to_wav(audio_tuple):
