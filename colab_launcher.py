@@ -28,7 +28,6 @@ MODEL_DOWNLOADS = [
         "base_dir": "/content/models/ASR/whisper-large-v3-turbo",
         "required": ["config.json", "model.safetensors", "tokenizer.json"],
         "files": [
-            ("1YMIVCfltXRvJe7kf8mkdf19m98lLDycs", ".gitattributes"),
             ("1sRQcWhWMZ27o476c83bK-OvbtQkeaSOz", "added_tokens.json"),
             ("1yYjItrxHj3NtKRelZEL7dgWFJbkWqIlZ", "config.json"),
             ("1qG6I6imQ9k7U0fcDLtAqj6HEdc-Jf6AX", "generation_config.json"),
@@ -47,12 +46,9 @@ MODEL_DOWNLOADS = [
         "base_dir": "/content/models/OmniVoice",
         "required": ["config.json", "model.safetensors", "tokenizer.json", "audio_tokenizer/model.safetensors"],
         "files": [
-            ("1X0-hJaRw5Wti66t5f3ZhCK79fg5giiJx", "audio_tokenizer/.gitattributes"),
             ("1qdeNiWdU_hvEpGgID57F6c0o6sf3xn_E", "audio_tokenizer/config.json"),
-            ("1FED19ASG41j-UIhj5ETkuhTsEwtM1SXu", "audio_tokenizer/LICENSE"),
             ("1qnwO3-zICrbjF9A62wuVveUkWI6LI-fx", "audio_tokenizer/model.safetensors"),
             ("18mL4eJovoi6bKZYrO44894WXZnpXYGiD", "audio_tokenizer/preprocessor_config.json"),
-            ("1XytA7Va1FRJ2c64TySE8DR_AI9qr3BxL", ".gitattributes"),
             ("1EVY3RuvQIPAK09oUxEIIYOQKCz2YdSUd", "chat_template.jinja"),
             ("1IGsMJ9W7wgbjh5ih_LPFKvZcKfr822fk", "config.json"),
             ("1UbgN0LNbiC7RUxzY-n_gJMayOiK7P5B1", "model.safetensors"),
@@ -208,6 +204,15 @@ def _download_drive_file(file_id, output_path):
     append_log(log_stream.getvalue())
 
 
+def _try_download_drive_file(file_id, output_path):
+    try:
+        _download_drive_file(file_id, output_path)
+        return True
+    except Exception as exc:
+        append_log(f"Falha opcional ao baixar {os.path.basename(output_path)}: {exc}")
+        return False
+
+
 def _validate_download_group(base_dir, required_files):
     for relative_path in required_files:
         if not os.path.isfile(os.path.join(base_dir, relative_path)):
@@ -235,7 +240,7 @@ def prepare_public_models(model_public_url):
         for file_id, relative_path in group["files"]:
             output_path = os.path.join(base_dir, relative_path)
             append_log(f"Baixando: {group['name']} -> {relative_path}")
-            _download_drive_file(file_id, output_path)
+            _try_download_drive_file(file_id, output_path)
         if _validate_download_group(base_dir, group["required"]):
             append_log(f"OK: pacote pronto -> {group['name']}")
             results[group["name"]] = base_dir
