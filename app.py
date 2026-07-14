@@ -437,12 +437,14 @@ def load_model(status_callback=None):
     if status_callback:
         status_callback("Baixando e iniciando modelo OmniVoice", "Carregando modelo na GPU T4...", 90)
 
+    hf_token = os.getenv("HF_TOKEN", "").strip() or None
+
     MODEL = OmniVoice.from_pretrained(
         config.MODEL_ID,
         device_map="cuda",
         dtype=torch.float16,
         load_asr=True,
-        token=False,
+        token=hf_token,
     )
     SAMPLING_RATE = MODEL.sampling_rate
     return MODEL

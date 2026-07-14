@@ -149,6 +149,7 @@ def run_from_colab(
     repo_url,
     branch="main",
     project_dir="/content/clonador_vs_github",
+    hf_token="",
     telegram_bot_token="",
     telegram_chat_id="",
     telegram_send_audio=True,
@@ -163,6 +164,7 @@ def run_from_colab(
 
         update_loading("Carregando aplicacao", "Importando arquivos do projeto...", 75)
         append_log("> Importando app.py e config.py...")
+        os.environ["HF_TOKEN"] = hf_token.strip()
         os.environ["TELEGRAM_BOT_TOKEN"] = telegram_bot_token.strip()
         os.environ["TELEGRAM_CHAT_ID"] = telegram_chat_id.strip()
         os.environ["TELEGRAM_SEND_AUDIO"] = "true" if telegram_send_audio else "false"
