@@ -4,8 +4,6 @@ import os
 import subprocess
 import sys
 import time
-import io
-import contextlib
 
 import IPython.display as display
 from IPython.display import clear_output
@@ -194,19 +192,40 @@ def install_requirements(project_dir):
     )
 
 
-def _download_drive_file(file_id, output_path):
-    import gdown
-
+def _download_drive_file(file_id, output_path, stage_name):
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    log_stream = io.StringIO()
-    with contextlib.redirect_stdout(log_stream), contextlib.redirect_stderr(log_stream):
-        gdown.download(id=file_id, output=output_path, quiet=False, use_cookies=False)
-    append_log(log_stream.getvalue())
+    command = [
+        sys.executable,
+        "-m",
+        "gdown",
+        "--id",
+        file_id,
+        "--output",
+        output_path,
+        "--no-cookies",
+    ]
+    process = subprocess.Popen(
+        command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
+    )
+    if process.stdout is not None:
+        for line in process.stdout:
+            clean_line = line.rstrip()
+            if not clean_line:
+                continue
+            append_log(clean_line)
+            update_loading("Baixando modelo", stage_name, 88)
+    return_code = process.wait()
+    if return_code != 0:
+        raise RuntimeError(f"Falha ao baixar arquivo do Google Drive: {os.path.basename(output_path)}")
 
 
-def _try_download_drive_file(file_id, output_path):
+def _try_download_drive_file(file_id, output_path, stage_name):
     try:
-        _download_drive_file(file_id, output_path)
+        _download_drive_file(file_id, output_path, stage_name)
         return True
     except Exception as exc:
         append_log(f"Falha opcional ao baixar {os.path.basename(output_path)}: {exc}")
@@ -240,7 +259,7 @@ def prepare_public_models(model_public_url):
         for file_id, relative_path in group["files"]:
             output_path = os.path.join(base_dir, relative_path)
             append_log(f"Baixando: {group['name']} -> {relative_path}")
-            _try_download_drive_file(file_id, output_path)
+            _try_download_drive_file(file_id, output_path, f"{group['name']} -> {relative_path}")
         if _validate_download_group(base_dir, group["required"]):
             append_log(f"OK: pacote pronto -> {group['name']}")
             results[group["name"]] = base_dir
