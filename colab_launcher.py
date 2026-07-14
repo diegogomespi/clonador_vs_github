@@ -22,6 +22,46 @@ INSTALL_STEPS = [
 INSTALL_LOGS = []
 DISPLAY_HANDLE = None
 
+MODEL_DOWNLOADS = [
+    {
+        "name": "ASR Whisper Large V3 Turbo",
+        "base_dir": "/content/models/ASR/whisper-large-v3-turbo",
+        "required": ["config.json", "model.safetensors", "tokenizer.json"],
+        "files": [
+            ("1YMIVCfltXRvJe7kf8mkdf19m98lLDycs", ".gitattributes"),
+            ("1sRQcWhWMZ27o476c83bK-OvbtQkeaSOz", "added_tokens.json"),
+            ("1yYjItrxHj3NtKRelZEL7dgWFJbkWqIlZ", "config.json"),
+            ("1qG6I6imQ9k7U0fcDLtAqj6HEdc-Jf6AX", "generation_config.json"),
+            ("1V3KcbMd4-cWMGr6GPqOQHXXkIhv7NlLR", "merges.txt"),
+            ("1L6W1dpkYL3xBusgoiwumrT6ZznTJ2v1g", "model.safetensors"),
+            ("1Tps6ziAc7R7ldW8JC27TqacjeZ3iPQKq", "normalizer.json"),
+            ("1RCx4D3S1vqawZ8dtQRJMOZNkFTt8CFwc", "preprocessor_config.json"),
+            ("17wnfI_wQOpM9SGeriJB6hEWYakyL33gD", "special_tokens_map.json"),
+            ("1tqCpOZQQSo3SE9h4hjatIUfX25WnBYYK", "tokenizer_config.json"),
+            ("17SyjSt-Ihjn1M3GeLhJvhnWv6-EPCA2D", "tokenizer.json"),
+            ("15oBGi089sPyMmjfeCm5YZSoKeBgXsy8p", "vocab.json"),
+        ],
+    },
+    {
+        "name": "OmniVoice",
+        "base_dir": "/content/models/OmniVoice",
+        "required": ["config.json", "model.safetensors", "tokenizer.json", "audio_tokenizer/model.safetensors"],
+        "files": [
+            ("1X0-hJaRw5Wti66t5f3ZhCK79fg5giiJx", "audio_tokenizer/.gitattributes"),
+            ("1qdeNiWdU_hvEpGgID57F6c0o6sf3xn_E", "audio_tokenizer/config.json"),
+            ("1FED19ASG41j-UIhj5ETkuhTsEwtM1SXu", "audio_tokenizer/LICENSE"),
+            ("1qnwO3-zICrbjF9A62wuVveUkWI6LI-fx", "audio_tokenizer/model.safetensors"),
+            ("18mL4eJovoi6bKZYrO44894WXZnpXYGiD", "audio_tokenizer/preprocessor_config.json"),
+            ("1XytA7Va1FRJ2c64TySE8DR_AI9qr3BxL", ".gitattributes"),
+            ("1EVY3RuvQIPAK09oUxEIIYOQKCz2YdSUd", "chat_template.jinja"),
+            ("1IGsMJ9W7wgbjh5ih_LPFKvZcKfr822fk", "config.json"),
+            ("1UbgN0LNbiC7RUxzY-n_gJMayOiK7P5B1", "model.safetensors"),
+            ("1J1kDT1ITZL8TV1Ie66SH9sHf14dlfkcR", "tokenizer_config.json"),
+            ("1jz6am42DswfayygIfCEn2CsZhetvCZo-", "tokenizer.json"),
+        ],
+    },
+]
+
 
 def append_log(message):
     if message is None:
@@ -158,37 +198,52 @@ def install_requirements(project_dir):
     )
 
 
-def prepare_public_model(model_public_url, local_model_dir):
-    public_url = (model_public_url or "").strip()
-    if not public_url:
-        return ""
-
-    if os.path.isdir(local_model_dir):
-        try:
-            shutil.rmtree(local_model_dir)
-        except OSError:
-            pass
-
-    os.makedirs(os.path.dirname(local_model_dir), exist_ok=True)
-    append_log("> Baixando modelo publico do Google Drive...")
-    update_loading("Baixando modelo", "Baixando modelo publico do Google Drive...", 88)
-
+def _download_drive_file(file_id, output_path):
     import gdown
 
-    download_root = os.path.dirname(local_model_dir)
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
     log_stream = io.StringIO()
     with contextlib.redirect_stdout(log_stream), contextlib.redirect_stderr(log_stream):
-        gdown.download_folder(url=public_url, output=download_root, quiet=False, use_cookies=False)
+        gdown.download(id=file_id, output=output_path, quiet=False, use_cookies=False)
     append_log(log_stream.getvalue())
 
-    config_path = os.path.join(local_model_dir, "config.json")
-    model_weights = os.path.join(local_model_dir, "model.safetensors")
-    if not (os.path.isfile(config_path) and os.path.isfile(model_weights)):
-        append_log("Modelo publico baixado, mas parece incompleto. Faltam arquivos principais.")
-        return ""
 
-    append_log("OK: modelo baixado do Google Drive")
-    return local_model_dir
+def _validate_download_group(base_dir, required_files):
+    for relative_path in required_files:
+        if not os.path.isfile(os.path.join(base_dir, relative_path)):
+            return False
+    return True
+
+
+def prepare_public_models(model_public_url):
+    public_url = (model_public_url or "").strip()
+    if not public_url:
+        return "", ""
+
+    append_log(f"> Usando pacote publico do Google Drive: {public_url}")
+    update_loading("Baixando modelo", "Baixando arquivos essenciais do Google Drive...", 88)
+
+    results = {}
+    for group in MODEL_DOWNLOADS:
+        base_dir = group["base_dir"]
+        if os.path.isdir(base_dir):
+            try:
+                shutil.rmtree(base_dir)
+            except OSError:
+                pass
+        append_log(f"> Baixando pacote: {group['name']}")
+        for file_id, relative_path in group["files"]:
+            output_path = os.path.join(base_dir, relative_path)
+            append_log(f"Baixando: {group['name']} -> {relative_path}")
+            _download_drive_file(file_id, output_path)
+        if _validate_download_group(base_dir, group["required"]):
+            append_log(f"OK: pacote pronto -> {group['name']}")
+            results[group["name"]] = base_dir
+        else:
+            append_log(f"Pacote incompleto -> {group['name']}")
+            results[group["name"]] = ""
+
+    return results.get("OmniVoice", ""), results.get("ASR Whisper Large V3 Turbo", "")
 
 
 def show_success(share_url):
@@ -224,11 +279,11 @@ def run_from_colab(
         update_loading("Preparando ambiente", "Iniciando configuracao do Colab...", 5)
         repo_dir = sync_repo(repo_url, branch, project_dir)
         install_requirements(repo_dir)
-        local_model_dir = prepare_public_model(model_public_url, "/content/models/OmniVoice")
-        local_asr_dir = "/content/models/ASR/whisper-large-v3-turbo"
-        if not os.path.isfile(os.path.join(local_asr_dir, "config.json")):
+        local_model_dir, local_asr_dir = prepare_public_models(model_public_url)
+        if not local_model_dir:
+            raise RuntimeError("Falha ao baixar os arquivos essenciais da OmniVoice do Google Drive.")
+        if not local_asr_dir:
             append_log("ASR local nao encontrado no pacote publico. O sistema usara o modo sem ASR local.")
-            local_asr_dir = ""
         else:
             append_log("OK: ASR local encontrado no pacote publico")
         final_enable_asr = bool(enable_asr and local_asr_dir)
