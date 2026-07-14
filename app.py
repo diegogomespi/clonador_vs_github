@@ -439,12 +439,14 @@ def load_model(status_callback=None):
 
     hf_token = os.getenv("HF_TOKEN", "").strip() or None
     model_source = config.MODEL_LOCAL_PATH or config.MODEL_ID
+    asr_model_source = config.ASR_MODEL_LOCAL_PATH or config.ASR_MODEL_ID
 
     MODEL = OmniVoice.from_pretrained(
         model_source,
         device_map="cuda",
         dtype=torch.float16,
         load_asr=config.ENABLE_ASR,
+        asr_model_name=asr_model_source,
         token=hf_token,
     )
     SAMPLING_RATE = MODEL.sampling_rate
@@ -518,8 +520,6 @@ def generate_speech(
     if mode == "clone":
         if ref_audio is None:
             return None, "Please upload a reference audio."
-        if (not config.ENABLE_ASR) and (not ref_text or not ref_text.strip()):
-            return None, "Preencha o campo Reference Text porque a transcricao automatica do ASR esta desativada."
         kwargs["voice_clone_prompt"] = model.create_voice_clone_prompt(
             ref_audio=ref_audio,
             ref_text=ref_text,

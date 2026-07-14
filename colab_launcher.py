@@ -181,6 +181,7 @@ def run_from_colab(
     branch="main",
     project_dir="/content/clonador_vs_github",
     model_public_url="",
+    enable_asr=True,
     hf_token="",
     telegram_bot_token="",
     telegram_chat_id="",
@@ -194,12 +195,21 @@ def run_from_colab(
         repo_dir = sync_repo(repo_url, branch, project_dir)
         install_requirements(repo_dir)
         local_model_dir = prepare_public_model(model_public_url, "/content/models/OmniVoice")
+        local_asr_dir = "/content/models/ASR/whisper-large-v3-turbo"
+        if not os.path.isfile(os.path.join(local_asr_dir, "config.json")):
+            append_log("ASR local nao encontrado no pacote publico. O sistema usara o modo sem ASR local.")
+            local_asr_dir = ""
+        else:
+            append_log("OK: ASR local encontrado no pacote publico")
+        final_enable_asr = bool(enable_asr and local_asr_dir)
 
         update_loading("Carregando aplicacao", "Importando arquivos do projeto...", 75)
         append_log("> Importando app.py e config.py...")
         os.environ["HF_TOKEN"] = hf_token.strip()
+        os.environ["ENABLE_ASR"] = "true" if final_enable_asr else "false"
         os.environ["MODEL_PUBLIC_URL"] = model_public_url.strip()
         os.environ["MODEL_LOCAL_PATH"] = local_model_dir.strip() if local_model_dir else ""
+        os.environ["ASR_MODEL_LOCAL_PATH"] = local_asr_dir.strip() if local_asr_dir else ""
         os.environ["TELEGRAM_BOT_TOKEN"] = telegram_bot_token.strip()
         os.environ["TELEGRAM_CHAT_ID"] = telegram_chat_id.strip()
         os.environ["TELEGRAM_SEND_AUDIO"] = "true" if telegram_send_audio else "false"

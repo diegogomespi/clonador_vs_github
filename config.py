@@ -5,8 +5,9 @@ APP_AUTHOR = "Diego Gomes"
 MODEL_ID = "k2-fsa/OmniVoice"
 MODEL_PUBLIC_URL = os.getenv("MODEL_PUBLIC_URL", "").strip()
 MODEL_LOCAL_PATH = os.getenv("MODEL_LOCAL_PATH", "").strip()
-ENABLE_ASR = os.getenv("ENABLE_ASR", "false").strip().lower() == "true"
+ENABLE_ASR = os.getenv("ENABLE_ASR", "true").strip().lower() == "true"
 ASR_MODEL_ID = os.getenv("ASR_MODEL_ID", "openai/whisper-large-v3-turbo").strip()
+ASR_MODEL_LOCAL_PATH = os.getenv("ASR_MODEL_LOCAL_PATH", "").strip()
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "").strip()
