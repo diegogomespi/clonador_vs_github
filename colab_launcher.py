@@ -131,30 +131,9 @@ def install_requirements(project_dir):
     )
 
 
-def prepare_drive_model(model_drive_path, local_model_dir):
-    drive_path = (model_drive_path or "").strip()
-    if not drive_path:
-        return ""
-
-    try:
-        from google.colab import drive
-
-        if not os.path.exists("/content/drive/MyDrive"):
-            append_log("> Montando Google Drive...")
-            update_loading("Baixando modelo", "Montando Google Drive...", 82)
-            drive.mount("/content/drive", force_remount=False)
-    except Exception as exc:
-        append_log(f"Falha ao montar Google Drive: {exc}")
-        return ""
-
-    if not os.path.isdir(drive_path):
-        append_log(f"Pasta do modelo nao encontrada no Drive: {drive_path}")
-        return ""
-
-    config_path = os.path.join(drive_path, "config.json")
-    model_weights = os.path.join(drive_path, "model.safetensors")
-    if not (os.path.isfile(config_path) and os.path.isfile(model_weights)):
-        append_log("Modelo no Drive parece incompleto. Faltam arquivos principais.")
+def prepare_public_model(model_public_url, local_model_dir):
+    public_url = (model_public_url or "").strip()
+    if not public_url:
         return ""
 
     if os.path.isdir(local_model_dir):
@@ -164,10 +143,21 @@ def prepare_drive_model(model_drive_path, local_model_dir):
             pass
 
     os.makedirs(os.path.dirname(local_model_dir), exist_ok=True)
-    append_log("> Copiando modelo do Google Drive para o ambiente do Colab...")
-    update_loading("Baixando modelo", "Copiando modelo do Google Drive...", 88)
-    shutil.copytree(drive_path, local_model_dir)
-    append_log("OK: modelo copiado do Google Drive")
+    append_log("> Baixando modelo publico do Google Drive...")
+    update_loading("Baixando modelo", "Baixando modelo publico do Google Drive...", 88)
+
+    import gdown
+
+    download_root = os.path.dirname(local_model_dir)
+    gdown.download_folder(url=public_url, output=download_root, quiet=False, use_cookies=False)
+
+    config_path = os.path.join(local_model_dir, "config.json")
+    model_weights = os.path.join(local_model_dir, "model.safetensors")
+    if not (os.path.isfile(config_path) and os.path.isfile(model_weights)):
+        append_log("Modelo publico baixado, mas parece incompleto. Faltam arquivos principais.")
+        return ""
+
+    append_log("OK: modelo baixado do Google Drive")
     return local_model_dir
 
 
@@ -190,7 +180,7 @@ def run_from_colab(
     repo_url,
     branch="main",
     project_dir="/content/clonador_vs_github",
-    model_drive_path="",
+    model_public_url="",
     hf_token="",
     telegram_bot_token="",
     telegram_chat_id="",
@@ -203,12 +193,12 @@ def run_from_colab(
         update_loading("Preparando ambiente", "Iniciando configuracao do Colab...", 5)
         repo_dir = sync_repo(repo_url, branch, project_dir)
         install_requirements(repo_dir)
-        local_model_dir = prepare_drive_model(model_drive_path, "/content/models/OmniVoice")
+        local_model_dir = prepare_public_model(model_public_url, "/content/models/OmniVoice")
 
         update_loading("Carregando aplicacao", "Importando arquivos do projeto...", 75)
         append_log("> Importando app.py e config.py...")
         os.environ["HF_TOKEN"] = hf_token.strip()
-        os.environ["MODEL_DRIVE_PATH"] = model_drive_path.strip()
+        os.environ["MODEL_PUBLIC_URL"] = model_public_url.strip()
         os.environ["MODEL_LOCAL_PATH"] = local_model_dir.strip() if local_model_dir else ""
         os.environ["TELEGRAM_BOT_TOKEN"] = telegram_bot_token.strip()
         os.environ["TELEGRAM_CHAT_ID"] = telegram_chat_id.strip()

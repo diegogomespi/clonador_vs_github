@@ -3,3 +3,4 @@ omnivoice
 pydub
 gradio==6.11.0
 requests
+gdown

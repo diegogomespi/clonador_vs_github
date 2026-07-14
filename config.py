@@ -3,7 +3,7 @@ import os
 APP_TITLE = "Clonador VS Studio"
 APP_AUTHOR = "Diego Gomes"
 MODEL_ID = "k2-fsa/OmniVoice"
-MODEL_DRIVE_PATH = os.getenv("MODEL_DRIVE_PATH", "").strip()
+MODEL_PUBLIC_URL = os.getenv("MODEL_PUBLIC_URL", "").strip()
 MODEL_LOCAL_PATH = os.getenv("MODEL_LOCAL_PATH", "").strip()
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
