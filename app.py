@@ -444,7 +444,7 @@ def load_model(status_callback=None):
         model_source,
         device_map="cuda",
         dtype=torch.float16,
-        load_asr=True,
+        load_asr=config.ENABLE_ASR,
         token=hf_token,
     )
     SAMPLING_RATE = MODEL.sampling_rate
@@ -518,6 +518,8 @@ def generate_speech(
     if mode == "clone":
         if ref_audio is None:
             return None, "Please upload a reference audio."
+        if (not config.ENABLE_ASR) and (not ref_text or not ref_text.strip()):
+            return None, "Preencha o campo Reference Text porque a transcricao automatica do ASR esta desativada."
         kwargs["voice_clone_prompt"] = model.create_voice_clone_prompt(
             ref_audio=ref_audio,
             ref_text=ref_text,
