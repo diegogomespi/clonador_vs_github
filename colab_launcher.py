@@ -4,6 +4,8 @@ import os
 import subprocess
 import sys
 import time
+import io
+import contextlib
 
 import IPython.display as display
 from IPython.display import clear_output
@@ -22,35 +24,60 @@ DISPLAY_HANDLE = None
 
 
 def append_log(message):
-    INSTALL_LOGS.append(message)
+    if message is None:
+        return
+    text = str(message).replace("\r\n", "\n").replace("\r", "\n")
+    for line in text.split("\n"):
+        line = line.rstrip()
+        if not line:
+            continue
+        INSTALL_LOGS.append(line)
     if len(INSTALL_LOGS) > 200:
         del INSTALL_LOGS[:-200]
 
 
 def render_loading(stage, detail="", progress=0, error=None):
-    safe_logs = "<br>".join(html.escape(line) for line in INSTALL_LOGS[-12:])
+    safe_logs = "<br>".join(html.escape(line) for line in INSTALL_LOGS[-24:])
+    full_log_text = "\n".join(INSTALL_LOGS)
+    safe_log_value = html.escape(full_log_text, quote=True)
     safe_stage = html.escape(stage)
     safe_detail = html.escape(error) if error else html.escape(detail)
     color = "#ef4444" if error else "#8b5cf6"
     progress = max(0, min(100, int(progress)))
+    step_cards = "".join(
+        f"""
+        <div style='padding:12px 14px; border-radius:14px; background:linear-gradient(180deg, #171125 0%, #120d1e 100%); border:1px solid #2b1d47; color:#d8c8f5; font-size:13px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);'>
+          <div style='opacity:0.92; margin-bottom:6px;'>{html.escape(name)}</div>
+          <strong style='color:white; font-size:18px; letter-spacing:0.02em;'>{pct}%</strong>
+        </div>
+        """
+        for name, pct in INSTALL_STEPS
+    )
     return f"""
-<div style='background: #0a0812; padding: 32px; border-radius: 16px; text-align: center; font-family: Inter, sans-serif; max-width: 820px; margin: 0 auto; border: 1px solid #1e1533; box-shadow: 0 18px 50px rgba(0,0,0,0.35);'>
-  <div style='display:flex; align-items:center; justify-content:center; gap:12px; margin-bottom: 10px;'>
-    <div style='width:18px; height:18px; border-radius:50%; background:{color}; box-shadow:0 0 18px {color};'></div>
-    <h2 style='color: white; margin: 0; font-size: 1.8em; font-weight: 600;'>Clonador VS Studio</h2>
+<div style='background: radial-gradient(circle at top, #130d22 0%, #09070f 58%); padding: 34px; border-radius: 22px; text-align: center; font-family: Inter, sans-serif; max-width: 920px; margin: 0 auto; border: 1px solid #221535; box-shadow: 0 24px 60px rgba(0,0,0,0.45); position:relative; overflow:hidden;'>
+  <div style='position:absolute; inset:-120px auto auto -80px; width:220px; height:220px; background:rgba(139,92,246,0.10); filter:blur(40px); border-radius:50%;'></div>
+  <div style='position:absolute; inset:auto -60px -80px auto; width:220px; height:220px; background:rgba(99,102,241,0.08); filter:blur(42px); border-radius:50%;'></div>
+  <div style='position:relative; display:flex; align-items:center; justify-content:center; gap:12px; margin-bottom: 8px;'>
+    <div style='width:18px; height:18px; border-radius:50%; background:{color}; box-shadow:0 0 20px {color};'></div>
+    <h2 style='color: white; margin: 0; font-size: 2.1em; font-weight: 700; letter-spacing:-0.02em;'>Clonador VS Studio</h2>
   </div>
   <p style='color: #b9a3dd; margin: 0 0 18px 0; font-size: 15px;'>By Diego Gomes</p>
-  <div style='background:#130d1f; border:1px solid #2b1d47; border-radius:999px; overflow:hidden; height:16px; margin: 0 auto 16px auto; max-width: 620px;'>
+  <div style='position:relative; background:#130d1f; border:1px solid #2b1d47; border-radius:999px; overflow:hidden; height:18px; margin: 0 auto 18px auto; max-width: 700px; box-shadow: inset 0 1px 4px rgba(0,0,0,0.35);'>
     <div style='height:100%; width:{progress}%; background:linear-gradient(90deg, #6d28d9 0%, #a78bfa 100%); transition: width 0.3s ease;'></div>
   </div>
-  <div style='color:#e9ddff; font-size: 24px; font-weight: 600; margin-bottom: 8px;'>{safe_stage}</div>
-  <div style='color:#a78bfa; font-size: 14px; margin-bottom: 18px; min-height: 20px;'>{safe_detail}</div>
-  <div style='display:grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 0 auto 18px auto; max-width: 720px;'>
-    {''.join(f"<div style='padding:10px 12px; border-radius:12px; background:#130d1f; border:1px solid #24173c; color:#d8c8f5; font-size:13px;'>{html.escape(name)}<br><strong style='color:white;'>{pct}%</strong></div>" for name, pct in INSTALL_STEPS)}
+  <div style='position:relative; color:#f3edff; font-size: 2em; font-weight: 700; margin-bottom: 8px; letter-spacing:-0.02em;'>{safe_stage}</div>
+  <div style='position:relative; color:#a78bfa; font-size: 15px; margin-bottom: 20px; min-height: 20px;'>{safe_detail}</div>
+  <div style='display:grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 0 auto 20px auto; max-width: 760px; position:relative;'>
+    {step_cards}
   </div>
-  <div style='text-align:left; background:#05030a; border:1px solid #221535; color:#d1c4eb; padding:16px; border-radius:12px; min-height:180px; max-height:260px; overflow:auto; font-family: Consolas, monospace; font-size: 12px; line-height: 1.5;'>
+  <div style='display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px; position:relative;'>
+    <div style='color:#e9ddff; font-size:15px; font-weight:600;'>Log completo da instalacao</div>
+    <button onclick="navigator.clipboard.writeText(document.getElementById('codex-full-log').value)" style='background:linear-gradient(180deg, #221535 0%, #171024 100%); color:#ffffff; border:1px solid #3a2460; border-radius:10px; padding:9px 14px; cursor:pointer; font-weight:600;'>Copiar log</button>
+  </div>
+  <div style='text-align:left; background:#05030a; border:1px solid #221535; color:#d1c4eb; padding:16px; border-radius:16px; min-height:230px; max-height:340px; overflow:auto; font-family: Consolas, monospace; font-size: 12px; line-height: 1.55; box-shadow: inset 0 1px 0 rgba(255,255,255,0.03); position:relative;'>
     {safe_logs or 'Aguardando inicio da instalacao...'}
   </div>
+  <textarea id='codex-full-log' style='position:absolute; left:-9999px; top:-9999px;'>{safe_log_value}</textarea>
 </div>
 """
 
@@ -149,7 +176,10 @@ def prepare_public_model(model_public_url, local_model_dir):
     import gdown
 
     download_root = os.path.dirname(local_model_dir)
-    gdown.download_folder(url=public_url, output=download_root, quiet=False, use_cookies=False)
+    log_stream = io.StringIO()
+    with contextlib.redirect_stdout(log_stream), contextlib.redirect_stderr(log_stream):
+        gdown.download_folder(url=public_url, output=download_root, quiet=False, use_cookies=False)
+    append_log(log_stream.getvalue())
 
     config_path = os.path.join(local_model_dir, "config.json")
     model_weights = os.path.join(local_model_dir, "model.safetensors")
